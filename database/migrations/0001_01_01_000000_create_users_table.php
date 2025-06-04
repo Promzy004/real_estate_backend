@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('phone_number', 15);
             $table->string('email')->unique();
             $table->enum('role', [ 'admin', 'agent', 'buyer'])->default('buyer');
+            $table->string('verification_code')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
