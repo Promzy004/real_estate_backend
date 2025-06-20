@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\VerificationMail;
 use App\Models\User;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
@@ -25,7 +28,8 @@ class UserController extends Controller
 
             $verification_code = fake()->numberBetween(100000,999999);
             $validated['verification_code'] = $verification_code;
-            User::create($validated);
+            $user = User::create($validated);
+            Mail::to($user->email)->send(new VerificationMail($user));
 
             return response()->json([
                 'success' => true,
@@ -42,9 +46,21 @@ class UserController extends Controller
     }
 
     public function verify(Request $request) {
-        $validate = $request->validate([
-            'otp' => 'required|integer',
+    
+        // $validate = $request->validate([
+        //     'otp' => 'required|digits:6',
+        // ]);
+
+        $validate = Validator::make($request->all(),[
+            'otp' => 'required|digits:6'
         ]);
+
+        if($validate->fails()){
+            return response()->json([
+                'error' => $validate->errors()
+            ], 400);
+        }
+
         $otp = $request->input('otp');
         $email = $request->input('email');
 
@@ -64,9 +80,9 @@ class UserController extends Controller
                     'message' => 'Invalid code entered'
                 ], 400);
             }
-        } catch(\Exception $error) {
+        } catch(ValidationException $e) {
             return response()->json([
-                'errors' => $error
+                'errors' => $e->errors(),
             ]);
         }
     }
@@ -79,11 +95,12 @@ class UserController extends Controller
 
         if(Auth::attempt($info)){
             $user = User::where('email', $request->email)->first();
-            $token = $user->createToken('auth_token')->plainTextToken;
+            $token = $user->createToken($user->firstname . 'auth_token')->plainTextToken;
 
             return response()->json([
                 'access_token' => $token,
                 'user' => $user,
+                'token_type' => 'Bearer',
                 'message' => 'Logged in succefully'
             ], 200);
         } else {
@@ -92,5 +109,19 @@ class UserController extends Controller
             ], 500);
         }
 
+    }
+
+    public function logout(Request $request) {
+        $user = User::where('id', $request->user()->id)->first();
+        if($user) {
+            $user->tokens()->delete();
+            return response()->json([
+                'message' => 'Successfully logged out',
+            ], 201);
+        } else {
+            return response()->json([
+                'message' => 'user not found'
+            ], 401);
+        }
     }
 }

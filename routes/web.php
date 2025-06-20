@@ -3,4 +3,6 @@
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', [UserController::class, 'register']);
+Route::get('/', function () {
+    return View('emails.verificationMail');
+});
